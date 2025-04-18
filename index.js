@@ -11,6 +11,7 @@ const brokerUrl = "wss://broker.emqx.io:8084/mqtt";
 const generalTopic = "finance-bills-app";//-localhost-broker";
 const getTopic = `${generalTopic}-get`;
 const postTopic = `${generalTopic}-post`;
+const putTopic = `${generalTopic}-put`;
 const deleteTopic = `${generalTopic}-delete`;
 
 const backendBaseUrl = "http://10.0.0.151:8080";
@@ -26,6 +27,7 @@ client.on("connect", () => {
 client.subscribe(generalTopic);
 client.subscribe(getTopic);
 client.subscribe(postTopic);
+client.subscribe(putTopic);
 client.subscribe(deleteTopic);
 client.subscribe(`${generalTopic}-filtro-comprador`);
 client.subscribe(`${generalTopic}-filtro-banco`);
@@ -105,10 +107,31 @@ client.on("message", async (topic, payload) => {
         clientWpp.sendMessage(number, `Foi criado uma nova conta: \n${jsonData.titulo}\nR$ ${jsonData.valor}\n${jsonData.comprador}\n${jsonData.categoria}`);
     }
 
+
+    // !-------------------------------------- PUT !--------------------------------------  //
+    if (topic == putTopic) {
+        try {
+            axios.put(`${backendBaseUrl}/conta/update`, JSON.parse(data));
+            console.log('Alguém atualizou uma conta');
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    if(topic == `${generalTopic}-isPaid`) {
+        axios.put(`${backendBaseUrl}/conta/isPaid`, JSON.parse(data));
+        console.log(`Alguém definiu alterou a conta de id ${JSON.parse(data).id} para: ${JSON.parse(data).isPaid}`);
+    }
+
+
     // !-------------------------------------- DELETE !--------------------------------------  //
     if (topic == deleteTopic) {
-        console.log("Alguém deletou uma bill!");
-        axios.delete(`${backendBaseUrl}/conta/delete/${data}`);
+        try {
+            axios.delete(`${backendBaseUrl}/conta/delete/${data}`);
+            console.log("Alguém deletou uma bill!");
+        } catch (e) {
+            console.error(e);
+        }
     }
 
 });
