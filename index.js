@@ -32,8 +32,10 @@ client.subscribe(deleteTopic);
 client.subscribe(`${generalTopic}-filtro-comprador`);
 client.subscribe(`${generalTopic}-filtro-banco`);
 client.subscribe(`${generalTopic}-filtro-comprador-banco`);
-client.subscribe(`${generalTopic}-filtro-allbanks`); // Esse aqui vai retornar o total de valor dos bancos de cada um dos users
+client.subscribe(`${generalTopic}-filtro-allbanks`);
 client.subscribe(`${generalTopic}-generalBills-getData`);
+client.subscribe(`${generalTopic}-isPaid`);
+client.subscribe(`${generalTopic}-get-paids`);
 client.on("message", async (topic, payload) => {
     const data = payload.toString();
 
@@ -88,11 +90,22 @@ client.on("message", async (topic, payload) => {
                 }
             });
             const apiData = await response.data;
-            client.publish(`${generalTopic}`, JSON.stringify(apiData));
+            client.publish(generalTopic, JSON.stringify(apiData));
             console.log(`Alguém tá usando o filtro comprador-banco: ${data}`);
         } catch (e) {
             console.error(e);
         }
+    }
+
+    if (topic == `${generalTopic}-get-paids`) {
+        try {
+            const response = await axios.get(`${backendBaseUrl}/conta/get/paids`);
+            const apiData = await response.data;
+            client.publish(generalTopic, JSON.stringify(apiData));
+        } catch (e) {
+            console.error(e);
+        }
+
     }
 
     // !-------------------------------------- POST !--------------------------------------  //
@@ -118,7 +131,7 @@ client.on("message", async (topic, payload) => {
         }
     }
 
-    if(topic == `${generalTopic}-isPaid`) {
+    if (topic == `${generalTopic}-isPaid`) {
         axios.put(`${backendBaseUrl}/conta/isPaid`, JSON.parse(data));
         console.log(`Alguém definiu alterou a conta de id ${JSON.parse(data).id} para: ${JSON.parse(data).isPaid}`);
     }
