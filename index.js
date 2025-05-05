@@ -2,19 +2,19 @@ const mqtt = require('mqtt');
 const axios = require('axios');
 
 //Api WPP
-const { clientWpp, number } = require('./botWhats');
+/* const { clientWpp, number, isClientReady } = require('./botWhats'); */
 
 //--------------------------!Para o futuro!-------------------------------//
 //Implementar uma lógica para que ao não obter sucesso conectando-se à um broker mqtt, tentar se conectar à outra URL
 //const brokerUrl = "mqtt://test.mosquitto.org:1883";
 const brokerUrl = "wss://broker.emqx.io:8084/mqtt";
-const generalTopic = "finance-bills-app";//-localhost-broker";
+const generalTopic = "finance-bills-app-localhost-broker";
 const getTopic = `${generalTopic}-get`;
 const postTopic = `${generalTopic}-post`;
 const putTopic = `${generalTopic}-put`;
 const deleteTopic = `${generalTopic}-delete`;
 
-const backendBaseUrl = "http://10.0.0.151:8080";
+const backendBaseUrl = "http://192.168.0.33:8080";
 
 const client = mqtt.connect(brokerUrl);
 
@@ -36,6 +36,7 @@ client.subscribe(`${generalTopic}-filtro-allbanks`);
 client.subscribe(`${generalTopic}-generalBills-getData`);
 client.subscribe(`${generalTopic}-isPaid`);
 client.subscribe(`${generalTopic}-get-paids`);
+client.subscribe(`${generalTopic}-get-somatotal&home`);
 client.on("message", async (topic, payload) => {
     const data = payload.toString();
 
@@ -55,7 +56,7 @@ client.on("message", async (topic, payload) => {
             client.publish(generalTopic, JSON.stringify(apiData));
             console.log(`N° de acessos: ${nRequisicoes += 1}`);
         } catch (e) {
-            console.log("Erro de conexão com o servidor");
+            console.log("Erro de conexão com o servidor backend");
         }
     }
 
@@ -108,6 +109,22 @@ client.on("message", async (topic, payload) => {
 
     }
 
+    if (topic == `${generalTopic}-get-somatotal&home`) {
+        try {
+            const response = await axios.get(data);
+            const apiData = await response.data;
+            if (data.includes("somatotal")) {
+                client.publish(`${generalTopic}-generalBills`, JSON.stringify(apiData));
+            }
+            if (data.includes("home")) {
+                client.publish(generalTopic, JSON.stringify(apiData));
+            }
+            console.log("Filtrando por período!");
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     // !-------------------------------------- POST !--------------------------------------  //
     if (topic == postTopic) {
         try {
@@ -117,7 +134,9 @@ client.on("message", async (topic, payload) => {
         }
         console.log("Foi cadastrado uma nova bill!");
         const jsonData = JSON.parse(data);
-        clientWpp.sendMessage(number, `Foi criado uma nova conta: \n${jsonData.titulo}\nR$ ${jsonData.valor}\n${jsonData.comprador}\n${jsonData.categoria}`);
+        /* if (isClientReady) {
+            clientWpp.sendMessage(number, `Foi criado uma nova conta: \n${jsonData.titulo}\nR$ ${jsonData.valor}\n${jsonData.comprador}\n${jsonData.categoria}`);
+        } */
     }
 
 
