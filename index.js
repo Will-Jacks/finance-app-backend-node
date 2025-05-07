@@ -8,13 +8,13 @@ const axios = require('axios');
 //Implementar uma lógica para que ao não obter sucesso conectando-se à um broker mqtt, tentar se conectar à outra URL
 //const brokerUrl = "mqtt://test.mosquitto.org:1883";
 const brokerUrl = "wss://broker.emqx.io:8084/mqtt";
-const generalTopic = "finance-bills-app-localhost-broker";
-const getTopic = `${generalTopic}-get`;
+const generalTopic = "finance-bills-app";//-localhost-broker";
+
 const postTopic = `${generalTopic}-post`;
 const putTopic = `${generalTopic}-put`;
 const deleteTopic = `${generalTopic}-delete`;
 
-const backendBaseUrl = "http://192.168.0.33:8080";
+const backendBaseUrl = "http://192.168.0.33:8080/bill";
 
 const client = mqtt.connect(brokerUrl);
 
@@ -24,34 +24,37 @@ client.on("connect", () => {
     console.log("Cliente conectado com sucesso!");
 });
 
-client.subscribe(generalTopic);
-client.subscribe(getTopic);
+client.subscribe(`${generalTopic}-all`);
+client.subscribe(`${generalTopic}-parcial-bills`);
+client.subscribe(`${generalTopic}-summary`);
+client.subscribe(`${generalTopic}-paids`);
+client.subscribe(`${generalTopic}-somatotal&home`);
+
 client.subscribe(postTopic);
 client.subscribe(putTopic);
 client.subscribe(deleteTopic);
-client.subscribe(`${generalTopic}-filtro-comprador`);
-client.subscribe(`${generalTopic}-filtro-banco`);
-client.subscribe(`${generalTopic}-filtro-comprador-banco`);
-client.subscribe(`${generalTopic}-filtro-allbanks`);
-client.subscribe(`${generalTopic}-generalBills-getData`);
-client.subscribe(`${generalTopic}-isPaid`);
-client.subscribe(`${generalTopic}-get-paids`);
-client.subscribe(`${generalTopic}-get-somatotal&home`);
+
+
+
 client.on("message", async (topic, payload) => {
     const data = payload.toString();
 
     // !-------------------------------------- GET !--------------------------------------  //
-    if (data == "fetchUrl") {
-        console.log("Alguém solicitou contas gerais!");
-        const response = await axios.get(`${backendBaseUrl}/conta/all`);
-        const apiData = await response.data;
-        client.publish(generalTopic, JSON.stringify(apiData));
+    if (topic == `${generalTopic}-all`) {
+        try {
+            const response = await axios.get(`${backendBaseUrl}/all`);
+            const apiData = await response.data;
+            client.publish(generalTopic, JSON.stringify(apiData));
+        } catch (e) {
+            console.error(e);
+        }
 
+        console.log("Alguém solicitou contas gerais!");
     }
 
-    if (data == "parcial-bills") {
+    if (topic == `${generalTopic}-parcial-bills`) {
         try {
-            const response = await axios.get(`${backendBaseUrl}/conta/parcial-bills`);
+            const response = await axios.get(`${backendBaseUrl}/parcial-bills`);
             const apiData = await response.data;
             client.publish(generalTopic, JSON.stringify(apiData));
             console.log(`N° de acessos: ${nRequisicoes += 1}`);
@@ -59,6 +62,89 @@ client.on("message", async (topic, payload) => {
             console.log("Erro de conexão com o servidor backend");
         }
     }
+
+    if (topic == `${generalTopic}-summary`) {
+        const response = await axios.get(`${backendBaseUrl}/summary`);
+        const apiData = await response.data;
+        client.publish(`${generalTopic}-summary-interface`, JSON.stringify(apiData));
+        console.log("Alguém acessou o GeneralBills");
+    }
+
+    if (topic == `${generalTopic}-paids`) {
+        try {
+            const response = await axios.get(`${backendBaseUrl}/paids`);
+            const apiData = await response.data;
+            client.publish(generalTopic, JSON.stringify(apiData));
+        } catch (e) {
+            console.error(e);
+        }
+
+    }
+
+    if (topic == `${generalTopic}-somatotal&home`) {
+        try {
+            const response = await axios.get(data);
+            const apiData = await response.data;
+            if (data.includes("somatotal")) {
+                client.publish(`${generalTopic}-summary-interface`, JSON.stringify(apiData));
+            }
+            if (data.includes("home")) {
+                client.publish(generalTopic, JSON.stringify(apiData));
+            }
+            console.log("Filtrando por período!");
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // !-------------------------------------- POST !--------------------------------------  //
+    if (topic == postTopic) {
+        try {
+            axios.post(`${backendBaseUrl}/save`, JSON.parse(data));
+        } catch (e) {
+            console.error(e);
+        }
+        console.log("Foi cadastrado uma nova bill!");
+        const jsonData = JSON.parse(data);
+        /* if (isClientReady) {
+            clientWpp.sendMessage(number, `Foi criado uma nova conta: \n${jsonData.titulo}\nR$ ${jsonData.valor}\n${jsonData.comprador}\n${jsonData.categoria}`);
+        } */
+    }
+
+
+    // !-------------------------------------- PUT !--------------------------------------  //
+    if (topic == putTopic) {
+        try {
+            axios.put(`${backendBaseUrl}/update`, JSON.parse(data));
+            console.log('Alguém atualizou uma conta');
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    if (topic == `${generalTopic}-isPaid`) {
+        axios.put(`${backendBaseUrl}/isPaid`, JSON.parse(data));
+        console.log(`Alguém definiu alterou a conta de id ${JSON.parse(data).id} para: ${JSON.parse(data).isPaid}`);
+    }
+
+
+    // !-------------------------------------- DELETE !--------------------------------------  //
+    if (topic == deleteTopic) {
+        try {
+            axios.delete(`${backendBaseUrl}/delete/${data}`);
+            console.log("Alguém deletou uma bill!");
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+});
+
+/*
+    client.subscribe(`${generalTopic}-filtro-comprador`);
+    client.subscribe(`${generalTopic}-filtro-banco`);
+    client.subscribe(`${generalTopic}-filtro-comprador-banco`);
+    client.subscribe(`${generalTopic}-filtro-allbanks`);
 
     if (topic == `${generalTopic}-filtro-comprador`) {
         const response = await axios.get(`${backendBaseUrl}/conta/comprador?comprador=${data}`);
@@ -74,17 +160,10 @@ client.on("message", async (topic, payload) => {
         console.log(`Alguém está filtrando por: ${data}`);
     }
 
-    if (topic == `${generalTopic}-generalBills-getData`) {
-        const response = await axios.get(`${backendBaseUrl}/conta/getallbanks`);
-        const apiData = await response.data;
-        client.publish(`${generalTopic}-generalBills`, JSON.stringify(apiData));
-        console.log("Alguém acessou o GeneralBills");
-    }
-
     if (topic == `${generalTopic}-filtro-comprador-banco`) {
         const formattedData = JSON.parse(data);
         try {
-            const response = await axios.get(`${backendBaseUrl}/conta/filter`, {
+            const response = await axios.get(`${backendBaseUrl}/filter`, {
                 params: {
                     comprador: formattedData.comprador,
                     banco: formattedData.banco
@@ -97,73 +176,4 @@ client.on("message", async (topic, payload) => {
             console.error(e);
         }
     }
-
-    if (topic == `${generalTopic}-get-paids`) {
-        try {
-            const response = await axios.get(`${backendBaseUrl}/conta/get/paids`);
-            const apiData = await response.data;
-            client.publish(generalTopic, JSON.stringify(apiData));
-        } catch (e) {
-            console.error(e);
-        }
-
-    }
-
-    if (topic == `${generalTopic}-get-somatotal&home`) {
-        try {
-            const response = await axios.get(data);
-            const apiData = await response.data;
-            if (data.includes("somatotal")) {
-                client.publish(`${generalTopic}-generalBills`, JSON.stringify(apiData));
-            }
-            if (data.includes("home")) {
-                client.publish(generalTopic, JSON.stringify(apiData));
-            }
-            console.log("Filtrando por período!");
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    // !-------------------------------------- POST !--------------------------------------  //
-    if (topic == postTopic) {
-        try {
-            axios.post(`${backendBaseUrl}/conta/save`, JSON.parse(data));
-        } catch (e) {
-            console.error(e);
-        }
-        console.log("Foi cadastrado uma nova bill!");
-        const jsonData = JSON.parse(data);
-        /* if (isClientReady) {
-            clientWpp.sendMessage(number, `Foi criado uma nova conta: \n${jsonData.titulo}\nR$ ${jsonData.valor}\n${jsonData.comprador}\n${jsonData.categoria}`);
-        } */
-    }
-
-
-    // !-------------------------------------- PUT !--------------------------------------  //
-    if (topic == putTopic) {
-        try {
-            axios.put(`${backendBaseUrl}/conta/update`, JSON.parse(data));
-            console.log('Alguém atualizou uma conta');
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    if (topic == `${generalTopic}-isPaid`) {
-        axios.put(`${backendBaseUrl}/conta/isPaid`, JSON.parse(data));
-        console.log(`Alguém definiu alterou a conta de id ${JSON.parse(data).id} para: ${JSON.parse(data).isPaid}`);
-    }
-
-
-    // !-------------------------------------- DELETE !--------------------------------------  //
-    if (topic == deleteTopic) {
-        try {
-            axios.delete(`${backendBaseUrl}/conta/delete/${data}`);
-            console.log("Alguém deletou uma bill!");
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-});
+*/
