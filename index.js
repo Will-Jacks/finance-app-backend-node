@@ -3,25 +3,21 @@ const axios = require('axios');
 
 //Api WPP
 /* const { clientWpp, number, isClientReady } = require('./botWhats'); */
-
-//--------------------------!Para o futuro!-------------------------------//
-//Implementar uma lógica para que ao não obter sucesso conectando-se à um broker mqtt, tentar se conectar à outra URL
 //const brokerUrl = "mqtt://test.mosquitto.org:1883";
+
+const backendBaseUrl = "http://192.168.0.33:8080/bill";
 const brokerUrl = "wss://broker.emqx.io:8084/mqtt";
 const generalTopic = "finance-bills-app";//-localhost-broker";
 
 const postTopic = `${generalTopic}-post`;
 const putTopic = `${generalTopic}-put`;
 const deleteTopic = `${generalTopic}-delete`;
-
-const backendBaseUrl = "http://192.168.0.33:8080/bill";
-
 const client = mqtt.connect(brokerUrl);
 
 let nRequisicoes = 0;
 
 client.on("connect", () => {
-    console.log("Cliente conectado com sucesso!");
+    console.log("MQTT online!");
 });
 
 client.subscribe(`${generalTopic}-all`);
@@ -29,6 +25,7 @@ client.subscribe(`${generalTopic}-parcial-bills`);
 client.subscribe(`${generalTopic}-summary`);
 client.subscribe(`${generalTopic}-paids`);
 client.subscribe(`${generalTopic}-somatotal&home`);
+client.subscribe(`${generalTopic}-isPaid`);
 
 client.subscribe(postTopic);
 client.subscribe(putTopic);
@@ -64,9 +61,14 @@ client.on("message", async (topic, payload) => {
     }
 
     if (topic == `${generalTopic}-summary`) {
-        const response = await axios.get(`${backendBaseUrl}/summary`);
-        const apiData = await response.data;
-        client.publish(`${generalTopic}-summary-interface`, JSON.stringify(apiData));
+        try {
+            const response = await axios.get(`${backendBaseUrl}/summary`);
+            const apiData = await response.data;
+            client.publish(`${generalTopic}-summary-interface`, JSON.stringify(apiData));
+        } catch (e) {
+            console.error(e);
+        }
+
         console.log("Alguém acessou o GeneralBills");
     }
 
@@ -85,10 +87,10 @@ client.on("message", async (topic, payload) => {
         try {
             const response = await axios.get(data);
             const apiData = await response.data;
-            if (data.includes("somatotal")) {
+            if (data.includes("totals-by-period")) {
                 client.publish(`${generalTopic}-summary-interface`, JSON.stringify(apiData));
             }
-            if (data.includes("home")) {
+            if (data.includes("bills-by-period")) {
                 client.publish(generalTopic, JSON.stringify(apiData));
             }
             console.log("Filtrando por período!");
@@ -123,7 +125,7 @@ client.on("message", async (topic, payload) => {
     }
 
     if (topic == `${generalTopic}-isPaid`) {
-        axios.put(`${backendBaseUrl}/isPaid`, JSON.parse(data));
+        await axios.put(`${backendBaseUrl}/isPaid`, JSON.parse(data));
         console.log(`Alguém definiu alterou a conta de id ${JSON.parse(data).id} para: ${JSON.parse(data).isPaid}`);
     }
 
