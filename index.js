@@ -60,18 +60,6 @@ client.on("message", async (topic, payload) => {
         }
     }
 
-    if (topic == `${generalTopic}-summary`) {
-        try {
-            const response = await axios.get(`${backendBaseUrl}/summary`);
-            const apiData = await response.data;
-            client.publish(`${generalTopic}-summary-interface`, JSON.stringify(apiData));
-        } catch (e) {
-            console.error(e);
-        }
-
-        console.log("Alguém acessou o GeneralBills");
-    }
-
     if (topic == `${generalTopic}-paids`) {
         try {
             const response = await axios.get(`${backendBaseUrl}/paids`);
@@ -89,11 +77,12 @@ client.on("message", async (topic, payload) => {
             const apiData = await response.data;
             if (data.includes("totals-by-period")) {
                 client.publish(`${generalTopic}-summary-interface`, JSON.stringify(apiData));
+                console.log("Alguém acessou o GeneralBills");
             }
             if (data.includes("bills-by-period")) {
                 client.publish(generalTopic, JSON.stringify(apiData));
+                console.log("Alguém está usando o filtro por período na home");
             }
-            console.log("Filtrando por período!");
         } catch (e) {
             console.error(e);
         }
