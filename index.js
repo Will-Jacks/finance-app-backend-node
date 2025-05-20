@@ -7,7 +7,7 @@ const axios = require('axios');
 
 const backendBaseUrl = "http://192.168.0.33:8080/bill";
 const brokerUrl = "wss://broker.emqx.io:8084/mqtt";
-const generalTopic = "finance-bills-app";//-localhost-broker";
+const generalTopic = "finance-bills-app-localhost-broker";
 
 const postTopic = `${generalTopic}-post`;
 const putTopic = `${generalTopic}-put`;
@@ -122,7 +122,7 @@ client.on("message", async (topic, payload) => {
     // !-------------------------------------- DELETE !--------------------------------------  //
     if (topic == deleteTopic) {
         try {
-            axios.delete(`${backendBaseUrl}/delete/${data}`);
+            await axios.delete(`${backendBaseUrl}/delete/${data}`);
             console.log("Alguém deletou uma bill!");
         } catch (e) {
             console.error(e);
