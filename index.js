@@ -7,7 +7,7 @@ const axios = require('axios');
 
 const backendBaseUrl = "http://192.168.0.33:8080/bill";
 const brokerUrl = "wss://broker.emqx.io:8084/mqtt";
-const generalTopic = "finance-bills-app-localhost-broker";
+const generalTopic = "finance-bills-app"//-localhost-broker";
 
 const postTopic = `${generalTopic}-post`;
 const putTopic = `${generalTopic}-put`;
@@ -91,7 +91,7 @@ client.on("message", async (topic, payload) => {
     // !-------------------------------------- POST !--------------------------------------  //
     if (topic == postTopic) {
         try {
-            axios.post(`${backendBaseUrl}/save`, JSON.parse(data));
+            await axios.post(`${backendBaseUrl}/save`, JSON.parse(data));
         } catch (e) {
             console.error(e);
         }
@@ -106,7 +106,7 @@ client.on("message", async (topic, payload) => {
     // !-------------------------------------- PUT !--------------------------------------  //
     if (topic == putTopic) {
         try {
-            axios.put(`${backendBaseUrl}/update`, JSON.parse(data));
+            await axios.put(`${backendBaseUrl}/update`, JSON.parse(data));
             console.log('Alguém atualizou uma conta');
         } catch (e) {
             console.error(e);
@@ -130,41 +130,3 @@ client.on("message", async (topic, payload) => {
     }
 
 });
-
-/*
-    client.subscribe(`${generalTopic}-filtro-comprador`);
-    client.subscribe(`${generalTopic}-filtro-banco`);
-    client.subscribe(`${generalTopic}-filtro-comprador-banco`);
-    client.subscribe(`${generalTopic}-filtro-allbanks`);
-
-    if (topic == `${generalTopic}-filtro-comprador`) {
-        const response = await axios.get(`${backendBaseUrl}/conta/comprador?comprador=${data}`);
-        const apiData = await response.data;
-        client.publish(generalTopic, JSON.stringify(apiData));
-        console.log(`Alguém utilizou o filtro de compras: ${data}`);
-    }
-
-    if (topic == `${generalTopic}-filtro-banco`) {
-        const response = await axios.get(`${backendBaseUrl}/conta/banco?banco=${data}`);
-        const apiData = await response.data;
-        client.publish(generalTopic, JSON.stringify(apiData));
-        console.log(`Alguém está filtrando por: ${data}`);
-    }
-
-    if (topic == `${generalTopic}-filtro-comprador-banco`) {
-        const formattedData = JSON.parse(data);
-        try {
-            const response = await axios.get(`${backendBaseUrl}/filter`, {
-                params: {
-                    comprador: formattedData.comprador,
-                    banco: formattedData.banco
-                }
-            });
-            const apiData = await response.data;
-            client.publish(generalTopic, JSON.stringify(apiData));
-            console.log(`Alguém tá usando o filtro comprador-banco: ${data}`);
-        } catch (e) {
-            console.error(e);
-        }
-    }
-*/
