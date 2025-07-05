@@ -2,12 +2,12 @@ const mqtt = require('mqtt');
 const axios = require('axios');
 
 //Api WPP
-/* const { clientWpp, number, isClientReady } = require('./botWhats'); */
+const { clientWpp, number, isClientReady } = require('./botWhats');
 //const brokerUrl = "mqtt://test.mosquitto.org:1883";
 
 const backendBaseUrl = "http://192.168.0.33:8080/bill";
 const brokerUrl = "wss://broker.emqx.io:8084/mqtt";
-const generalTopic = "finance-bills-app"//-localhost-broker";
+const generalTopic = "finance-bills-app";//-localhost-broker";
 
 const postTopic = `${generalTopic}-post`;
 const putTopic = `${generalTopic}-put`;
@@ -94,12 +94,15 @@ client.on("message", async (topic, payload) => {
             await axios.post(`${backendBaseUrl}/save`, JSON.parse(data));
         } catch (e) {
             console.error(e);
+            return;
         }
+        client.publish(`${generalTopic}-ping-pong`, 'create');
         console.log("Foi cadastrado uma nova bill!");
         const jsonData = JSON.parse(data);
-        /* if (isClientReady) {
+        if (isClientReady) {
             clientWpp.sendMessage(number, `Foi criado uma nova conta: \n${jsonData.titulo}\nR$ ${jsonData.valor}\n${jsonData.comprador}\n${jsonData.categoria}`);
-        } */
+            console.log("Mensagem do whats enviada.");
+        }
     }
 
 
@@ -110,7 +113,9 @@ client.on("message", async (topic, payload) => {
             console.log('Alguém atualizou uma conta');
         } catch (e) {
             console.error(e);
+            return;
         }
+        client.publish(`${generalTopic}-ping-pong`, 'edit');
     }
 
     if (topic == `${generalTopic}-isPaid`) {
@@ -126,7 +131,9 @@ client.on("message", async (topic, payload) => {
             console.log("Alguém deletou uma bill!");
         } catch (e) {
             console.error(e);
+            return;
         }
+        client.publish(`${generalTopic}-ping-pong`, 'delete');
     }
 
 });
