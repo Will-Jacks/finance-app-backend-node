@@ -3,11 +3,12 @@ const axios = require('axios');
 
 //Api WPP
 const { clientWpp, number, isClientReady } = require('./botWhats');
-//const brokerUrl = "mqtt://test.mosquitto.org:1883";
+/* const brokerUrl = "mqtt://test.mosquitto.org:1883"; */
 
-const backendBaseUrl = "http://192.168.0.33:8080/bill";
+const backendBaseUrl = "http://192.168.0.11:8080";
+
 const brokerUrl = "wss://broker.emqx.io:8084/mqtt";
-const generalTopic = "finance-bills-app";//-localhost-broker";
+const generalTopic = "finance-bills-app-localhost-broker";
 
 const postTopic = `${generalTopic}-post`;
 const putTopic = `${generalTopic}-put`;
@@ -26,6 +27,8 @@ client.subscribe(`${generalTopic}-summary`);
 client.subscribe(`${generalTopic}-paids`);
 client.subscribe(`${generalTopic}-somatotal&home`);
 client.subscribe(`${generalTopic}-isPaid`);
+client.subscribe(`${generalTopic}-post-ganhos-trigger`);
+client.subscribe(`${generalTopic}-get-month-income`);
 
 client.subscribe(postTopic);
 client.subscribe(putTopic);
@@ -39,7 +42,7 @@ client.on("message", async (topic, payload) => {
     // !-------------------------------------- GET !--------------------------------------  //
     if (topic == `${generalTopic}-all`) {
         try {
-            const response = await axios.get(`${backendBaseUrl}/all`);
+            const response = await axios.get(`${backendBaseUrl}/bill/all`);
             const apiData = await response.data;
             client.publish(generalTopic, JSON.stringify(apiData));
         } catch (e) {
@@ -51,7 +54,7 @@ client.on("message", async (topic, payload) => {
 
     if (topic == `${generalTopic}-parcial-bills`) {
         try {
-            const response = await axios.get(`${backendBaseUrl}/parcial-bills`);
+            const response = await axios.get(`${backendBaseUrl}/bill/parcial-bills`);
             const apiData = await response.data;
             client.publish(generalTopic, JSON.stringify(apiData));
             console.log(`N° de acessos: ${nRequisicoes += 1}`);
@@ -62,7 +65,7 @@ client.on("message", async (topic, payload) => {
 
     if (topic == `${generalTopic}-paids`) {
         try {
-            const response = await axios.get(`${backendBaseUrl}/paids`);
+            const response = await axios.get(`${backendBaseUrl}/bill/paids`);
             const apiData = await response.data;
             client.publish(generalTopic, JSON.stringify(apiData));
         } catch (e) {
@@ -88,10 +91,24 @@ client.on("message", async (topic, payload) => {
         }
     }
 
+    if (topic == `${generalTopic}-get-month-income`) {
+        const response = await axios.get(`${backendBaseUrl}/gains/get/month-income`);
+        const data = response.data;
+        client.publish(`${generalTopic}-income-data-response`, JSON.stringify(data));
+    }
+
     // !-------------------------------------- POST !--------------------------------------  //
     if (topic == postTopic) {
         try {
-            await axios.post(`${backendBaseUrl}/save`, JSON.parse(data));
+            const jsonParse = JSON.parse(data);
+            if (jsonParse.comprador == "Will") {
+                jsonParse.comprador = "William";
+            }
+            if (jsonParse.comprador == "Lívia 🌻") {
+                jsonParse.comprador = "Lívia";
+            }
+            const post = await axios.post(`${backendBaseUrl}/bill/save`, jsonParse);
+            client.publish(generalTopic, JSON.stringify(post.data));
         } catch (e) {
             console.error(e);
             return;
@@ -99,9 +116,17 @@ client.on("message", async (topic, payload) => {
         client.publish(`${generalTopic}-ping-pong`, 'create');
         console.log("Foi cadastrado uma nova bill!");
         const jsonData = JSON.parse(data);
-        if (isClientReady) {
-            clientWpp.sendMessage(number, `Foi criado uma nova conta: \n${jsonData.titulo}\nR$ ${jsonData.valor}\n${jsonData.comprador}\n${jsonData.categoria}`);
+        /* if (isClientReady) {
+            clientWpp.sendMessage(number, `💸 ${jsonData.comprador} registrou uma nova despesa no ${jsonData.banco}:\n📍 ${jsonData.titulo} – R$ ${jsonData.valor} (${jsonData.categoria})`);
             console.log("Mensagem do whats enviada.");
+        } */
+    }
+    if (topic == `${generalTopic}-post-ganhos-trigger`) {
+        try {
+            const formattedData = JSON.parse(data);
+            axios.post(`${backendBaseUrl}/gains/income`, formattedData);
+        } catch (e) {
+            console.error(e);
         }
     }
 
@@ -109,7 +134,7 @@ client.on("message", async (topic, payload) => {
     // !-------------------------------------- PUT !--------------------------------------  //
     if (topic == putTopic) {
         try {
-            await axios.put(`${backendBaseUrl}/update`, JSON.parse(data));
+            await axios.put(`${backendBaseUrl}/bill/update`, JSON.parse(data));
             console.log('Alguém atualizou uma conta');
         } catch (e) {
             console.error(e);
@@ -119,7 +144,7 @@ client.on("message", async (topic, payload) => {
     }
 
     if (topic == `${generalTopic}-isPaid`) {
-        await axios.put(`${backendBaseUrl}/isPaid`, JSON.parse(data));
+        await axios.put(`${backendBaseUrl}/bill/isPaid`, JSON.parse(data));
         console.log(`Alguém definiu alterou a conta de id ${JSON.parse(data).id} para: ${JSON.parse(data).isPaid}`);
     }
 
@@ -127,7 +152,7 @@ client.on("message", async (topic, payload) => {
     // !-------------------------------------- DELETE !--------------------------------------  //
     if (topic == deleteTopic) {
         try {
-            await axios.delete(`${backendBaseUrl}/delete/${data}`);
+            await axios.delete(`${backendBaseUrl}/bill/delete/${data}`);
             console.log("Alguém deletou uma bill!");
         } catch (e) {
             console.error(e);
